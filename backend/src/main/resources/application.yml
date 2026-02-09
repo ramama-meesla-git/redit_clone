@@ -1,0 +1,92 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: reddit-clone
+
+  # ─── JPA / Hibernate ───────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://localhost:5432/redditclone
+    username: reddit
+    password: reddit_secret_2024
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_batch_fetch_size: 20
+    open-in-view: false
+
+  # ─── Flyway ────────────────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  # ─── Redis ─────────────────────────────────────────────────
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redis_secret_2024
+      timeout: 5000
+
+  # ─── File Upload ───────────────────────────────────────────
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # ─── Jackson ───────────────────────────────────────────────
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+# ─── JWT Configuration ──────────────────────────────────────
+jwt:
+  secret: YTJiM2M0ZDVlNmY3ZzhoOWkwajFrMmwzbTRuNW82cDdxOHI5czB0MXUydjN3NHg1eTZ6
+  access-token-expiration: 86400000
+  refresh-token-expiration: 604800000
+
+# ─── MinIO Configuration ────────────────────────────────────
+minio:
+  endpoint: http://localhost:9000
+  access-key: minio_admin
+  secret-key: minio_secret_2024
+  bucket-name: reddit-clone
+
+# ─── Logging ─────────────────────────────────────────────────
+logging:
+  level:
+    com.redditclone: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+
+# ─── Actuator ────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# ─── CORS ────────────────────────────────────────────────────
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:80,http://localhost

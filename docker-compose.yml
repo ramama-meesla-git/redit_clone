@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL Database ───────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: reddit-postgres
+    environment:
+      POSTGRES_DB: redditclone
+      POSTGRES_USER: reddit
+      POSTGRES_PASSWORD: reddit_secret_2024
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reddit -d redditclone"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reddit-network
+
+  # ─── Redis Cache ───────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: reddit-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass redis_secret_2024
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_secret_2024", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reddit-network
+
+  # ─── MinIO Object Storage ─────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: reddit-minio
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_secret_2024
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - reddit-network
+
+  # ─── Spring Boot Backend ───────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: reddit-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/redditclone
+      SPRING_DATASOURCE_USERNAME: reddit
+      SPRING_DATASOURCE_PASSWORD: reddit_secret_2024
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: redis_secret_2024
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minio_admin
+      MINIO_SECRET_KEY: minio_secret_2024
+      JWT_SECRET: YTJiM2M0ZDVlNmY3ZzhoOWkwajFrMmwzbTRuNW82cDdxOHI5czB0MXUydjN3NHg1eTZ6
+      JWT_EXPIRATION: 86400000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - reddit-network
+
+  # ─── Vue.js Frontend ──────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: reddit-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - reddit-network
+
+  # ─── Nginx Reverse Proxy ──────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: reddit-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - reddit-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  reddit-network:
+    driver: bridge
